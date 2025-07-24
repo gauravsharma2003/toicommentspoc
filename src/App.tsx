@@ -1,19 +1,45 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, ThumbsUp, ThumbsDown, Meh, Send, X, Plus } from 'lucide-react';
+import { MessageCircle, ThumbsUp, Send, X } from 'lucide-react';
 
-const InteractiveNewsApp = () => {
-  const [comments, setComments] = useState([]);
-  const [paragraphComments, setParagraphComments] = useState({});
-  const [commentInput, setCommentInput] = useState('');
-  const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [bottomSheetView, setBottomSheetView] = useState('paragraph');
-  const [activeParagraph, setActiveParagraph] = useState(null);
-  const [viewportParagraphs, setViewportParagraphs] = useState(new Set());
-  const [focusedParagraph, setFocusedParagraph] = useState('p1');
-  const [showPollTooltip, setShowPollTooltip] = useState(null);
-  const [showOpinionTooltip, setShowOpinionTooltip] = useState(null);
-  const [opinionPolls, setOpinionPolls] = useState({
+// Types
+
+type CommentType = {
+  id: string;
+  text: string;
+  username: string;
+  timestamp: string;
+  likes?: number;
+  replies: any[];
+  isOpinion?: boolean;
+  paragraphId?: string;
+  reference?: string;
+};
+
+type OpinionPollsType = {
+  [key: string]: {
+    question: string;
+    responses: { user: string; option: string; timestamp: Date }[];
+  };
+};
+
+type ShowOpinionTooltipType = {
+  pollId: string;
+  response: string;
+  paragraphId: string;
+} | null;
+
+const InteractiveNewsApp: React.FC = () => {
+  const [comments, setComments] = useState<CommentType[]>([]);
+  const [paragraphComments, setParagraphComments] = useState<Record<string, CommentType[]>>({});
+  const [commentInput, setCommentInput] = useState<string>('');
+  const [showBottomSheet, setShowBottomSheet] = useState<boolean>(false);
+  const [bottomSheetView, setBottomSheetView] = useState<'paragraph' | 'overall'>('paragraph');
+  const [activeParagraph, setActiveParagraph] = useState<string | null>(null);
+  const [focusedParagraph, setFocusedParagraph] = useState<string>('p1');
+  const [showPollTooltip, setShowPollTooltip] = useState<string | null>(null);
+  const [showOpinionTooltip, setShowOpinionTooltip] = useState<ShowOpinionTooltipType>(null);
+  const [opinionPolls, setOpinionPolls] = useState<OpinionPollsType>({
     poll1: { question: "Do you think AI will revolutionize healthcare in the next 5 years?", responses: [] },
     poll2: { question: "Should there be stricter regulations on AI development?", responses: [] },
     commentPoll: { question: "Would you trust an AI system to diagnose your medical condition?", responses: [] }
@@ -76,7 +102,7 @@ const InteractiveNewsApp = () => {
 
   // Smooth scroll detection without flickering
   useEffect(() => {
-    let timeoutId = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let isInitialized = false;
     
     const handleScroll = () => {
@@ -87,7 +113,7 @@ const InteractiveNewsApp = () => {
       timeoutId = setTimeout(() => {
         const viewportHeight = window.innerHeight;
         const viewportMiddle = viewportHeight / 2;
-        let closestToMiddle = null;
+        let closestToMiddle: string | null = null;
         let closestDistance = Infinity;
 
         articleContent.forEach((section) => {
@@ -108,15 +134,12 @@ const InteractiveNewsApp = () => {
           }
         });
         
-        // Only change focus if we've moved away from the initial state or if this is not the first run
         if (isInitialized && closestToMiddle && closestToMiddle !== focusedParagraph) {
           setFocusedParagraph(closestToMiddle);
         } else if (!isInitialized) {
-          // On first load, keep p1 focused unless user has scrolled significantly
           const firstParagraph = document.getElementById('paragraph-p1');
           if (firstParagraph) {
             const firstRect = firstParagraph.getBoundingClientRect();
-            // Only change from p1 if it's completely out of view
             if (firstRect.bottom < 0) {
               if (closestToMiddle) {
                 setFocusedParagraph(closestToMiddle);
@@ -128,7 +151,6 @@ const InteractiveNewsApp = () => {
       }, 100);
     };
 
-    // Small delay to ensure DOM is ready, then check scroll position
     setTimeout(() => {
       handleScroll();
     }, 100);
@@ -140,7 +162,13 @@ const InteractiveNewsApp = () => {
     };
   }, [focusedParagraph]);
 
-  const handleOpinionClick = (pollId, option, questionText, paragraphId, isCommentPoll = false) => {
+  const handleOpinionClick = (
+    pollId: string,
+    option: string,
+    questionText: string,
+    paragraphId?: string | null,
+    isCommentPoll: boolean = false
+  ) => {
     setOpinionPolls(prev => ({
       ...prev,
       [pollId]: {
@@ -154,7 +182,7 @@ const InteractiveNewsApp = () => {
     const opinionText = `${emoji} ${response} - "${questionText}"`;
     
     if (!isCommentPoll && paragraphId) {
-      const newComment = {
+      const newComment: CommentType = {
         id: Date.now().toString(),
         text: opinionText,
         username: username,
@@ -169,7 +197,6 @@ const InteractiveNewsApp = () => {
         [paragraphId]: [...(prev[paragraphId] || []), newComment]
       }));
 
-      // Show tooltip with comment confirmation
       setShowOpinionTooltip({
         pollId,
         response: opinionText,
@@ -188,10 +215,10 @@ const InteractiveNewsApp = () => {
     setShowPollTooltip(null);
   };
 
-  const addParagraphComment = (paragraphId, commentText) => {
-    if (!commentText.trim()) return;
+  const addParagraphComment = (paragraphId: string | null, commentText: string) => {
+    if (!commentText.trim() || !paragraphId) return;
 
-    const newComment = {
+    const newComment: CommentType = {
       id: Date.now().toString(),
       text: commentText,
       username: username,
@@ -209,9 +236,9 @@ const InteractiveNewsApp = () => {
     addCommentWithReference(commentText, reference);
   };
 
-  const addCommentWithReference = (text, paragraphRef = '') => {
+  const addCommentWithReference = (text: string, paragraphRef: string = '') => {
     const commentText = paragraphRef ? `${text} ${paragraphRef}` : text;
-    const newComment = {
+    const newComment: CommentType = {
       id: Date.now().toString(),
       text: commentText,
       username: username,
@@ -230,17 +257,17 @@ const InteractiveNewsApp = () => {
     addCommentWithReference(commentInput);
   };
 
-  const handleParagraphClick = (paragraphId) => {
+  const handleParagraphClick = (paragraphId: string) => {
     setActiveParagraph(paragraphId);
     setBottomSheetView('paragraph');
     setShowBottomSheet(true);
   };
 
-  const OpinionPoll = ({ pollId, question, paragraphId }) => {
+  const OpinionPoll: React.FC<{ pollId: string; question: string; paragraphId?: string }> = ({ pollId, question, paragraphId }) => {
     const poll = opinionPolls[pollId];
-    const hasResponded = poll.responses.some(r => r.user === username);
+    const hasResponded = poll.responses.some((r) => r.user === username);
     const isOpen = showPollTooltip === pollId;
-    const [tooltipPosition, setTooltipPosition] = useState({ position: 'bottom', align: 'center' });
+    const [tooltipPosition, setTooltipPosition] = useState<{ position: 'top' | 'bottom'; align: 'left' | 'center' | 'right' }>({ position: 'bottom', align: 'center' });
 
     useEffect(() => {
       if (isOpen) {
@@ -249,28 +276,16 @@ const InteractiveNewsApp = () => {
           const rect = button.getBoundingClientRect();
           const viewportWidth = window.innerWidth;
           const viewportHeight = window.innerHeight;
-          const tooltipWidth = 256; // w-64 = 16rem = 256px
-          const tooltipHeight = 120; // approximate height
-          
-          let position = 'bottom';
-          let align = 'center';
-          
-          // Check if tooltip would go outside viewport horizontally
+          const tooltipWidth = 256;
+          const tooltipHeight = 120;
+          let position: 'top' | 'bottom' = 'bottom';
+          let align: 'left' | 'center' | 'right' = 'center';
           const centerX = rect.left + rect.width / 2;
           const leftEdge = centerX - tooltipWidth / 2;
           const rightEdge = centerX + tooltipWidth / 2;
-          
-          if (leftEdge < 16) { // 16px margin
-            align = 'left';
-          } else if (rightEdge > viewportWidth - 16) {
-            align = 'right';
-          }
-          
-          // Check if tooltip would go outside viewport vertically
-          if (rect.bottom + tooltipHeight > viewportHeight - 16) {
-            position = 'top';
-          }
-          
+          if (leftEdge < 16) align = 'left';
+          else if (rightEdge > viewportWidth - 16) align = 'right';
+          if (rect.bottom + tooltipHeight > viewportHeight - 16) position = 'top';
           setTooltipPosition({ position, align });
         }
       }
@@ -278,10 +293,8 @@ const InteractiveNewsApp = () => {
 
     const getTooltipClasses = () => {
       const baseClasses = "absolute z-20 w-64 bg-white rounded-xl shadow-lg border border-gray-200 p-3 animate-in fade-in duration-200";
-      
       let positionClasses = "";
       let arrowClasses = "";
-      
       if (tooltipPosition.position === 'top') {
         positionClasses = "bottom-6";
         arrowClasses = "absolute -bottom-1 w-2 h-2 bg-white border-r border-b border-gray-200 rotate-45";
@@ -289,18 +302,16 @@ const InteractiveNewsApp = () => {
         positionClasses = "top-6";
         arrowClasses = "absolute -top-1 w-2 h-2 bg-white border-l border-t border-gray-200 rotate-45";
       }
-      
       if (tooltipPosition.align === 'left') {
         positionClasses += " left-0";
-        arrowClasses += tooltipPosition.position === 'top' ? " left-4" : " left-4";
+        arrowClasses += " left-4";
       } else if (tooltipPosition.align === 'right') {
         positionClasses += " right-0";
-        arrowClasses += tooltipPosition.position === 'top' ? " right-4" : " right-4";
+        arrowClasses += " right-4";
       } else {
         positionClasses += " left-1/2 transform -translate-x-1/2";
         arrowClasses += " left-1/2 transform -translate-x-1/2";
       }
-      
       return {
         tooltip: `${baseClasses} ${positionClasses}`,
         arrow: arrowClasses
@@ -322,13 +333,10 @@ const InteractiveNewsApp = () => {
         >
           {hasResponded ? '✓' : '?'}
         </button>
-        
         {isOpen && (
           <div className={classes.tooltip}>
             <div className={classes.arrow}></div>
-            
             <p className="text-xs font-medium text-gray-800 mb-3">{question}</p>
-            
             {!hasResponded ? (
               <div className="flex gap-1">
                 {[
@@ -350,8 +358,6 @@ const InteractiveNewsApp = () => {
             )}
           </div>
         )}
-
-        {/* Opinion Confirmation Tooltip with viewport positioning */}
         {showOpinionTooltip && showOpinionTooltip.pollId === pollId && (
           <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-30 w-72 bg-green-50 border border-green-200 rounded-xl p-3 animate-in fade-in slide-in-from-top-2 duration-200 max-w-[calc(100vw-2rem)]">
             <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-green-50 border-l border-t border-green-200 rotate-45"></div>
@@ -372,10 +378,9 @@ const InteractiveNewsApp = () => {
     );
   };
 
-  const ParagraphWithComments = ({ section }) => {
+  const ParagraphWithComments: React.FC<{ section: { id: string; text: string; poll?: { id: string; position: string } } }> = ({ section }) => {
     const commentCount = paragraphComments[section.id]?.length || 0;
     const isFocused = focusedParagraph === section.id;
-
     return (
       <div
         id={`paragraph-${section.id}`}
@@ -400,7 +405,6 @@ const InteractiveNewsApp = () => {
             </div>
           </button>
         )}
-        
         <p className={`text-base leading-relaxed transition-colors duration-300 ${
           isFocused ? 'text-gray-900' : 'text-gray-700'
         }`}>
@@ -424,14 +428,12 @@ const InteractiveNewsApp = () => {
         <h1 className="text-xl font-bold text-gray-900">AI in Healthcare: The Future is Now</h1>
         <p className="text-sm text-gray-600 mt-1">Tech News • 12 min read</p>
       </div>
-
       {/* Article Content */}
       <div className="p-4">
         {articleContent.map((section) => (
           <ParagraphWithComments key={section.id} section={section} />
         ))}
       </div>
-
       {/* Bottom Sheet for Comments */}
       <AnimatePresence>
         {showBottomSheet && (
@@ -445,7 +447,6 @@ const InteractiveNewsApp = () => {
             <div className="flex justify-center py-3">
               <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
             </div>
-            
             <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <button
@@ -473,31 +474,32 @@ const InteractiveNewsApp = () => {
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
-
             <div className="p-4 overflow-y-auto max-h-96">
               {bottomSheetView === 'paragraph' ? (
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-4">
                     Comments on Paragraph {activeParagraph?.replace('p', '')}
                   </h3>
-                  
                   <div className="mb-4 p-3 bg-gray-50 rounded-xl">
                     <div className="flex gap-2">
                       <input
                         type="text"
                         placeholder="Add a comment to this paragraph..."
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && e.target.value.trim()) {
-                            addParagraphComment(activeParagraph, e.target.value);
-                            e.target.value = '';
+                        onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                          if (e.key === 'Enter') {
+                            const target = e.target as HTMLInputElement;
+                            if (target.value.trim()) {
+                              addParagraphComment(activeParagraph, target.value);
+                              target.value = '';
+                            }
                           }
                         }}
                       />
                       <button
-                        onClick={(e) => {
-                          const input = e.target.parentElement.querySelector('input');
-                          if (input.value.trim()) {
+                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                          const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement;
+                          if (input && input.value.trim()) {
                             addParagraphComment(activeParagraph, input.value);
                             input.value = '';
                           }
@@ -508,36 +510,36 @@ const InteractiveNewsApp = () => {
                       </button>
                     </div>
                   </div>
-                  
                   <div className="space-y-3">
-                    {paragraphComments[activeParagraph]?.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <div className={`w-8 h-8 ${comment.isOpinion ? 'bg-gradient-to-br from-yellow-500 to-orange-600' : 'bg-gradient-to-br from-purple-500 to-blue-600'} rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
-                          {comment.isOpinion ? comment.text.charAt(0) : comment.username.charAt(0)}
-                        </div>
-                        <div className="flex-1 bg-gray-50 rounded-2xl p-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-sm text-gray-900">{comment.username}</span>
-                            <div className="flex items-center gap-2">
-                              {comment.isOpinion && (
-                                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Opinion</span>
-                              )}
-                              <span className="text-xs text-gray-500">{comment.timestamp}</span>
-                            </div>
+                    {(activeParagraph && paragraphComments[activeParagraph]?.length)
+                      ? paragraphComments[activeParagraph].map((comment: CommentType) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <div className={`w-8 h-8 ${comment.isOpinion ? 'bg-gradient-to-br from-yellow-500 to-orange-600' : 'bg-gradient-to-br from-purple-500 to-blue-600'} rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
+                            {comment.isOpinion ? comment.text.charAt(0) : comment.username.charAt(0)}
                           </div>
-                          <p className="text-gray-800 text-sm leading-relaxed">{comment.text}</p>
+                          <div className="flex-1 bg-gray-50 rounded-2xl p-3">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-medium text-sm text-gray-900">{comment.username}</span>
+                              <div className="flex items-center gap-2">
+                                {comment.isOpinion && (
+                                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Opinion</span>
+                                )}
+                                <span className="text-xs text-gray-500">{comment.timestamp}</span>
+                              </div>
+                            </div>
+                            <p className="text-gray-800 text-sm leading-relaxed">{comment.text}</p>
+                          </div>
                         </div>
-                      </div>
-                    )) || (
-                      <p className="text-gray-500 text-center py-8">No comments yet for this paragraph</p>
-                    )}
+                      ))
+                      : <p className="text-gray-500 text-center py-8">No comments yet for this paragraph</p>
+                    }
                   </div>
                 </div>
               ) : (
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-4">All Comments ({comments.length})</h3>
                   <div className="space-y-3">
-                    {comments.map((comment) => (
+                    {comments.map((comment: CommentType) => (
                       <div key={comment.id} className="flex gap-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                           {comment.username.charAt(0)}
@@ -563,11 +565,9 @@ const InteractiveNewsApp = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* Comment Section */}
       <div id="comment-section" className="border-t border-gray-200 p-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Comments ({comments.length})</h2>
-        
         <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-100">
           <p className="text-sm text-gray-700 mb-2">{opinionPolls.commentPoll.question}</p>
           <div className="flex gap-2 flex-wrap">
@@ -586,7 +586,6 @@ const InteractiveNewsApp = () => {
             ))}
           </div>
         </div>
-        
         <div className="mb-6">
           <div className="flex gap-3 items-start">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
@@ -595,10 +594,10 @@ const InteractiveNewsApp = () => {
             <div className="flex-1">
               <textarea
                 value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentInput(e.target.value)}
                 placeholder="Share your thoughts..."
                 className="w-full p-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows="3"
+                rows={3}
               />
               <div className="flex justify-end mt-2">
                 <button
@@ -613,9 +612,8 @@ const InteractiveNewsApp = () => {
             </div>
           </div>
         </div>
-
         <div className="space-y-4">
-          {comments.map((comment) => (
+          {comments.map((comment: CommentType) => (
             <div key={comment.id} className="flex gap-3">
               <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                 {comment.username.charAt(0)}
